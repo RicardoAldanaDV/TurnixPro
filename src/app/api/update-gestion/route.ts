@@ -39,7 +39,7 @@ export async function POST(req: Request) {
 
     // 🔹 Si el estado es "Resuelto", también ponemos la FechaResolucion (columna K)
     if (nuevoEstado === "Resuelto") {
-      const fecha = new Date().toISOString();
+      const fecha = new Date().toISOString().split("T")[0]; // ✅ solo YYYY-MM-DD
       updates.push({
         range: `Sheet1!K${rowIndex + 1}`,
         values: [[fecha]],

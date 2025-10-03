@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardContent, CardTitle } from "@/components/ui/card";
+import * as Dialog from "@radix-ui/react-dialog";
 
 type Gestion = {
   ID: string;
@@ -23,6 +24,7 @@ type Gestion = {
 export default function ArchivoPage() {
   const [gestiones, setGestiones] = useState<Gestion[]>([]);
   const [busqueda, setBusqueda] = useState("");
+  const [gestionSeleccionada, setGestionSeleccionada] = useState<Gestion | null>(null);
 
   useEffect(() => {
     const fetchGestiones = async () => {
@@ -50,19 +52,39 @@ export default function ArchivoPage() {
     }
   };
 
+  const limpiarArchivo = async () => {
+    if (confirm("⚠️ ¿Estás seguro de limpiar todas las gestiones resueltas?")) {
+      const res = await fetch("/api/clear-historial", { method: "POST" });
+      if (res.ok) {
+        alert("✅ Archivo limpiado correctamente");
+        window.location.reload();
+      } else {
+        alert("❌ Error al limpiar el archivo");
+      }
+    }
+  };
+
   return (
     <div className="min-h-screen p-6 bg-neutral-900 text-white">
-      <Card className="bg-neutral-800 border border-neutral-700 shadow-lg">
+      <Card className="bg-neutral-900 border border-blue-500 shadow-[0_0_15px_#00f]">
         <CardHeader className="flex flex-row justify-between items-center">
-          <CardTitle className="text-xl font-semibold text-white flex items-center gap-2">
+          <CardTitle className="text-xl font-semibold text-blue-400 flex items-center gap-2">
             📂 Archivo de Gestiones Resueltas
           </CardTitle>
-          <Button
-            onClick={hacerBackup}
-            className="bg-blue-600 hover:bg-blue-700 text-white shadow-md"
-          >
-            Descargar Backup
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              onClick={hacerBackup}
+              className="bg-blue-600 hover:bg-blue-700 text-white shadow-[0_0_8px_#00f]"
+            >
+              Descargar Backup
+            </Button>
+            <Button
+              onClick={limpiarArchivo}
+              className="bg-red-600 hover:bg-red-700 text-white shadow-[0_0_12px_#f00] animate-pulse"
+            >
+              Limpiar Archivo
+            </Button>
+          </div>
         </CardHeader>
 
         <CardContent>
@@ -72,15 +94,15 @@ export default function ArchivoPage() {
               placeholder="Buscar por nombre, ID o fecha..."
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
-              className="w-full bg-neutral-900 border border-neutral-700 text-white placeholder-gray-400"
+              className="w-full bg-neutral-800 border border-blue-500 text-white placeholder-blue-300 shadow-[0_0_6px_#00f]"
             />
           </div>
 
           {/* Tabla */}
-          <div className="overflow-x-auto rounded-lg border border-neutral-700">
+          <div className="overflow-x-auto rounded-lg border border-blue-500 shadow-[0_0_12px_#00f]">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-neutral-700 text-gray-200">
+                <tr className="bg-blue-900/40 text-blue-300">
                   <th className="p-3 text-left">ID</th>
                   <th className="p-3 text-left">Nombres</th>
                   <th className="p-3 text-left">Apellidos</th>
@@ -92,7 +114,7 @@ export default function ArchivoPage() {
                   <tr>
                     <td
                       colSpan={4}
-                      className="text-center p-4 text-gray-400 italic"
+                      className="text-center p-4 text-blue-400 italic"
                     >
                       No hay gestiones resueltas
                     </td>
@@ -101,12 +123,13 @@ export default function ArchivoPage() {
                 {filtradas.map((g) => (
                   <tr
                     key={g.ID}
-                    className="border-t border-neutral-700 hover:bg-neutral-700/50 transition"
+                    className="cursor-pointer border-t border-blue-800 hover:bg-blue-900/30 transition"
+                    onClick={() => setGestionSeleccionada(g)}
                   >
-                    <td className="p-3 font-medium text-white">{g.ID}</td>
-                    <td className="p-3">{g.Nombres}</td>
-                    <td className="p-3">{g.Apellidos}</td>
-                    <td className="p-3 text-gray-300">{g.FechaResolucion}</td>
+                    <td className="p-3 font-bold text-white">{g.ID}</td>
+                    <td className="p-3 text-gray-200">{g.Nombres}</td>
+                    <td className="p-3 text-gray-200">{g.Apellidos}</td>
+                    <td className="p-3 text-blue-300">{g.FechaResolucion}</td>
                   </tr>
                 ))}
               </tbody>
@@ -114,6 +137,48 @@ export default function ArchivoPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Modal de solo lectura */}
+      <Dialog.Root open={!!gestionSeleccionada} onOpenChange={() => setGestionSeleccionada(null)}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 bg-black/60 backdrop-blur-sm" />
+          <Dialog.Content className="fixed top-1/2 left-1/2 w-[500px] max-h-[80vh] overflow-y-auto -translate-x-1/2 -translate-y-1/2 bg-neutral-900 border border-blue-500 shadow-[0_0_20px_#00f] p-6 rounded-lg text-white">
+            <Dialog.Title className="text-lg font-bold text-blue-400 mb-4">
+              📌 Detalles de la Gestión
+            </Dialog.Title>
+            {gestionSeleccionada && (
+              <div className="space-y-2">
+                <p><b>ID:</b> {gestionSeleccionada.ID}</p>
+                <p><b>Nombres:</b> {gestionSeleccionada.Nombres}</p>
+                <p><b>Apellidos:</b> {gestionSeleccionada.Apellidos}</p>
+                <p><b>Género:</b> {gestionSeleccionada.Genero}</p>
+                <p><b>Fecha de Nacimiento:</b> {gestionSeleccionada.FechaNacimiento}</p>
+                <p><b>Nombre del Padre:</b> {gestionSeleccionada.NombrePadre}</p>
+                <p><b>Nombre de la Madre:</b> {gestionSeleccionada.NombreMadre}</p>
+                <p><b>Lugar de Nacimiento:</b> {gestionSeleccionada.LugarNacimiento}</p>
+
+                <p className="font-bold">Comentarios:</p>
+                <div className="max-h-32 overflow-y-auto p-2 bg-neutral-800 rounded border border-blue-500 text-sm">
+                  {gestionSeleccionada.Comentarios || "Sin comentarios"}
+                </div>
+
+                <p><b>Fecha Registro:</b> {gestionSeleccionada.FechaRegistro}</p>
+                <p><b>Fecha Resolución:</b> {gestionSeleccionada.FechaResolucion}</p>
+              </div>
+            )}
+            <div className="flex justify-between items-center mt-6">
+              <Dialog.Close asChild>
+                <Button className="bg-gray-600 hover:bg-gray-700 text-white">
+                  Cerrar
+                </Button>
+              </Dialog.Close>
+              <span className="text-green-400 font-bold text-sm">
+                ✅ Gestión Resuelta
+              </span>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
     </div>
   );
 }

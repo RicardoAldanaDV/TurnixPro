@@ -1,8 +1,7 @@
 "use client";
+
 import { useEffect, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import GestionModal from "@/components/GestionModal";
+import * as Dialog from "@radix-ui/react-dialog";
 
 type Gestion = {
   ID: string;
@@ -22,142 +21,134 @@ type Gestion = {
 export default function DashboardPage() {
   const [pendientes, setPendientes] = useState<Gestion[]>([]);
   const [porLlamar, setPorLlamar] = useState<Gestion[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [gestionSeleccionada, setGestionSeleccionada] = useState<Gestion | null>(null);
 
-  // 🔹 Cargar gestiones desde Sheets
   const fetchGestiones = async () => {
-    try {
-      setLoading(true);
-      const res = await fetch("/api/get-gestiones");
-      const data = await res.json();
+    const res = await fetch("/api/get-gestiones");
+    const data = await res.json();
 
-      if (data.data) {
-        const todas: Gestion[] = data.data;
-        setPendientes(todas.filter((g) => g.Estado === "Pendiente"));
-        setPorLlamar(todas.filter((g) => g.Estado === "Por Llamar"));
-      }
-    } catch (error) {
-      console.error("Error cargando gestiones:", error);
-    } finally {
-      setLoading(false);
-    }
+    const todas: Gestion[] = data.data || [];
+    setPendientes(todas.filter((g) => g.Estado.toLowerCase() === "pendiente"));
+    setPorLlamar(todas.filter((g) => g.Estado.toLowerCase() === "por llamar"));
   };
 
   useEffect(() => {
     fetchGestiones();
   }, []);
 
-  // 🔹 Actualizar estado en Sheets
   const actualizarEstado = async (id: string, nuevoEstado: string) => {
-    try {
-      setLoading(true);
-      const res = await fetch("/api/update-gestion", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, nuevoEstado }),
-      });
-
-      if (!res.ok) throw new Error("Error en la actualización");
-      await fetchGestiones(); // refrescar desde Sheets
-    } catch (error) {
-      console.error("Error al actualizar estado:", error);
-      alert("❌ No se pudo actualizar la gestión.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // 🔹 Enviar gestión a la Pantalla (BroadcastChannel)
-  const llamarGestion = (id: string) => {
-    const canal = new BroadcastChannel("pantalla");
-
-    // Armamos la lista de espera (máx 5)
-    const enEspera = porLlamar
-      .filter((g) => g.ID !== id)
-      .slice(0, 5)
-      .map((g) => g.ID);
-
-    canal.postMessage({
-      tipo: "llamar",
-      data: { siguiente: id, enEspera },
+    await fetch("/api/update-gestion", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, nuevoEstado }),
     });
-
-    canal.close();
+    fetchGestiones();
+    setGestionSeleccionada(null);
   };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      {/* 🟡 Pendientes */}
-      <Card className="bg-neutral-800 border border-neutral-700 shadow-lg">
-        <CardHeader>
-          <CardTitle className="text-xl font-semibold text-white">
+    <div className="min-h-screen p-6 bg-neutral-900 text-white">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        
+        {/* Pendientes */}
+        <div className="bg-neutral-900 border border-blue-500 shadow-[0_0_15px_#00f] rounded-lg p-4">
+          <h2 className="text-lg font-bold mb-3 text-blue-400">
             Pendientes ({pendientes.length})
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {loading && <p className="text-sm text-gray-400">Cargando...</p>}
-          {pendientes.length === 0 && !loading && (
-            <p className="text-sm text-gray-400">No hay gestiones pendientes</p>
+          </h2>
+          {pendientes.length === 0 && (
+            <p className="text-blue-300 italic">No hay gestiones pendientes</p>
           )}
           {pendientes.map((g) => (
             <div
               key={g.ID}
-              className="flex justify-between items-center p-3 rounded-md bg-neutral-900 mb-2"
+              className="cursor-pointer border border-blue-500 rounded p-3 mb-2 hover:bg-blue-900/30 transition shadow-[0_0_6px_#00f]"
+              onClick={() => setGestionSeleccionada(g)}
             >
-              <span className="font-medium text-gray-200">
-                {g.ID} - {g.Nombres} {g.Apellidos}
-              </span>
-              <Button
-                size="sm"
-                className="bg-blue-600 hover:bg-blue-700 text-white"
-                onClick={() => actualizarEstado(g.ID, "Por Llamar")}
-              >
-                Mover a Por Llamar
-              </Button>
+              <p className="text-white font-bold">{g.ID}</p>
+              <p className="text-gray-300">{g.Nombres} {g.Apellidos}</p>
             </div>
           ))}
-        </CardContent>
-      </Card>
+        </div>
 
-      {/* 🔵 Por Llamar */}
-      <Card className="bg-neutral-800 border border-neutral-700 shadow-lg">
-        <CardHeader>
-          <CardTitle className="text-xl font-semibold text-white">
+        {/* Por Llamar */}
+        <div className="bg-neutral-900 border border-blue-500 shadow-[0_0_15px_#00f] rounded-lg p-4">
+          <h2 className="text-lg font-bold mb-3 text-blue-400">
             Por Llamar ({porLlamar.length})
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {porLlamar.length === 0 && !loading && (
-            <p className="text-sm text-gray-400">No hay gestiones por llamar</p>
+          </h2>
+          {porLlamar.length === 0 && (
+            <p className="text-blue-300 italic">No hay gestiones por llamar</p>
           )}
           {porLlamar.map((g) => (
             <div
               key={g.ID}
-              className="flex justify-between items-center p-3 rounded-md bg-neutral-900 mb-2"
+              className="cursor-pointer border border-blue-500 rounded p-3 mb-2 hover:bg-blue-900/30 transition shadow-[0_0_6px_#00f]"
+              onClick={() => setGestionSeleccionada(g)}
             >
-              <span className="font-medium text-gray-200">
-                {g.ID} - {g.Nombres} {g.Apellidos}
-              </span>
-              <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  className="bg-green-600 hover:bg-green-700 text-white"
-                  onClick={() => llamarGestion(g.ID)}
-                >
-                  Llamar
-                </Button>
-                <Button
-                  size="sm"
-                  className="bg-red-600 hover:bg-red-700 text-white"
-                  onClick={() => actualizarEstado(g.ID, "Resuelto")}
-                >
-                  Resuelto
-                </Button>
-              </div>
+              <p className="text-white font-bold">{g.ID}</p>
+              <p className="text-gray-300">{g.Nombres} {g.Apellidos}</p>
             </div>
           ))}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
+
+      {/* Modal de detalles con acciones */}
+      <Dialog.Root open={!!gestionSeleccionada} onOpenChange={() => setGestionSeleccionada(null)}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 bg-black/60 backdrop-blur-sm" />
+          <Dialog.Content className="fixed top-1/2 left-1/2 w-[500px] max-h-[80vh] overflow-y-auto -translate-x-1/2 -translate-y-1/2 bg-neutral-900 border border-blue-500 shadow-[0_0_20px_#00f] p-6 rounded-lg text-white">
+            <Dialog.Title className="text-lg font-bold text-blue-400 mb-4">
+              📌 Detalles de la Gestión
+            </Dialog.Title>
+            {gestionSeleccionada && (
+              <div className="space-y-2">
+                <p><b>ID:</b> {gestionSeleccionada.ID}</p>
+                <p><b>Nombres:</b> {gestionSeleccionada.Nombres}</p>
+                <p><b>Apellidos:</b> {gestionSeleccionada.Apellidos}</p>
+                <p><b>Género:</b> {gestionSeleccionada.Genero}</p>
+                <p><b>Fecha de Nacimiento:</b> {gestionSeleccionada.FechaNacimiento}</p>
+                <p><b>Nombre del Padre:</b> {gestionSeleccionada.NombrePadre}</p>
+                <p><b>Nombre de la Madre:</b> {gestionSeleccionada.NombreMadre}</p>
+                <p><b>Lugar de Nacimiento:</b> {gestionSeleccionada.LugarNacimiento}</p>
+
+                <p className="font-bold">Comentarios:</p>
+                <div className="max-h-32 overflow-y-auto p-2 bg-neutral-800 rounded border border-blue-500 text-sm">
+                  {gestionSeleccionada.Comentarios || "Sin comentarios"}
+                </div>
+
+                <p><b>Fecha Registro:</b> {gestionSeleccionada.FechaRegistro}</p>
+                <p><b>Fecha Resolución:</b> {gestionSeleccionada.FechaResolucion || "—"}</p>
+              </div>
+            )}
+            <div className="flex justify-between items-center mt-6">
+              <Dialog.Close asChild>
+                <button className="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded text-white">
+                  Cerrar
+                </button>
+              </Dialog.Close>
+
+              {gestionSeleccionada?.Estado.toLowerCase() === "pendiente" && (
+                <button
+                  onClick={() => actualizarEstado(gestionSeleccionada.ID, "Por Llamar")}
+                  className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 rounded text-white"
+                >
+                  Mover a Por Llamar
+                </button>
+              )}
+
+              {gestionSeleccionada?.Estado.toLowerCase() === "por llamar" && (
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => actualizarEstado(gestionSeleccionada.ID, "Resuelto")}
+                    className="px-4 py-2 bg-green-600 hover:bg-green-700 rounded text-white"
+                  >
+                    Resuelto
+                  </button>
+                </div>
+              )}
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
     </div>
   );
 }

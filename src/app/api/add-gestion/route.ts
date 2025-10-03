@@ -40,7 +40,7 @@ export async function POST(req: Request) {
           body.nombreMadre || "",
           body.lugarNacimiento || "",
           body.comentarios || "",
-          "pendiente", // estado inicial
+          "Pendiente", // estado inicial
           fechaRegistro,
         ]],
       },
